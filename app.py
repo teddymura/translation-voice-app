@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify, session
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 from gtts import gTTS
 import os
 import uuid
@@ -8,7 +8,6 @@ from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this')
-translator = Translator()
 
 LANG_MAP = {
     "en": "en", "ja": "ja", "fr": "fr", "de": "de",
@@ -93,8 +92,9 @@ def translate_ajax():
         
         # 翻訳（エラーハンドリング強化）
         try:
-            translated = translator.translate(text, dest=target_lang)
-            translated_text = translated.text
+            # deep-translatorを使用
+            translator = GoogleTranslator(source='auto', target=target_lang)
+            translated_text = translator.translate(text)
         except Exception as trans_error:
             print(f"翻訳サービスエラー: {trans_error}")
             return jsonify({"error": "翻訳サービスが利用できません"}), 503
