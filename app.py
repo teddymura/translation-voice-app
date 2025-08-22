@@ -1,88 +1,63 @@
-from flask import Flask, render_template, request, jsonify, session
-from deep_translator import GoogleTranslator
-from gtts import gTTS
+from flask import Flask, render_template, request, jsonify
 import os
-import uuid
-import glob
-from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this')
 
-LANG_MAP = {
-    "en": "en", "ja": "ja", "fr": "fr", "de": "de",
-    "it": "it", "es": "es", "ko": "ko", "zh-cn": "zh-CN"
-}
-
-UPLOAD_FOLDER = "uploads"
-STATIC_FOLDER = "static"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(STATIC_FOLDER, exist_ok=True)
-
-def cleanup_audio_files():
-    """staticフォルダ内の音声ファイルを5件まで残して削除"""
-    try:
-        # static フォルダ内の .mp3 ファイルを取得
-        audio_files = glob.glob(os.path.join(STATIC_FOLDER, "*.mp3"))
-        
-        # ファイルを作成日時でソート（新しい順）
-        audio_files.sort(key=lambda x: os.path.getctime(x), reverse=True)
-        
-        # 5件を超える古いファイルを削除
-        if len(audio_files) > 5:
-            for file_path in audio_files[5:]:
-                try:
-                    os.remove(file_path)
-                    print(f"削除しました: {file_path}")
-                except OSError as e:
-                    print(f"ファイル削除エラー: {file_path}, {e}")
-    except Exception as e:
-        print(f"音声ファイルクリーンアップエラー: {e}")
-
-def get_history():
-    """セッションから履歴を取得"""
-    return session.get('translation_history', [])
-
-def add_to_history(original, translated, audio_path=None):
-    """履歴に新しい翻訳結果を追加（重複チェック付き）"""
-    history = get_history()
-    
-    # 既に同じ翻訳結果が存在するかチェック
-    for existing_entry in history:
-        if (existing_entry['original'] == original and 
-            existing_entry['translated'] == translated):
-            # 同じ内容が既に存在する場合は追加しない
-            return
-    
-    # 新しいエントリを先頭に追加
-    new_entry = {
-        'original': original,
-        'translated': translated,
-        'audio': audio_path,
-        'timestamp': datetime.now().isoformat()
-    }
-    history.insert(0, new_entry)
-    
-    # 最新5件のみ保持
-    history = history[:5]
-    
-    # セッションに保存
-    session['translation_history'] = history
-    session.permanent = True  # セッションを永続化
-
 @app.route("/", methods=["GET"])
 def index():
     """メインページ表示"""
-    return render_template("index.html", history=get_history())
-
-@app.route("/get_history")
-def get_history_json():
-    """履歴をJSON形式で返す"""
-    return jsonify({"history": get_history()})
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>翻訳アプリ（テスト版）</title>
+        <meta charset="utf-8">
+    </head>
+    <body>
+        <h1>翻訳アプリ（最小構成テスト）</h1>
+        <form id="translateForm">
+            <input type="text" id="textInput" placeholder="翻訳したいテキストを入力" required>
+            <select id="langSelect">
+                <option value="en">English</option>
+                <option value="ja">日本語</option>
+                <option value="fr">Français</option>
+            </select>
+            <button type="submit">翻訳</button>
+        </form>
+        <div id="result"></div>
+        
+        <script>
+        document.getElementById('translateForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const text = document.getElementById('textInput').value;
+            const lang = document.getElementById('langSelect').value;
+            
+            fetch('/translate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'text=' + encodeURIComponent(text) + '&lang=' + lang
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('result').innerHTML = 
+                    '<h3>結果:</h3><p>' + data.message + '</p>';
+            })
+            .catch(error => {
+                document.getElementById('result').innerHTML = 
+                    '<p style="color: red;">エラーが発生しました</p>';
+            });
+        });
+        </script>
+    </body>
+    </html>
+    '''
 
 @app.route("/translate", methods=["POST"])
-def translate_ajax():
-    """Ajax用の翻訳エンドポイント"""
+def translate_test():
+    """テスト用翻訳エンドポイント"""
     try:
         target_lang = request.form.get("lang", "en")
         text = request.form.get("text", "").strip()
@@ -90,52 +65,14 @@ def translate_ajax():
         if not text:
             return jsonify({"error": "テキストが入力されていません"}), 400
         
-        # 翻訳（エラーハンドリング強化）
-        try:
-            # deep-translatorを使用
-            translator = GoogleTranslator(source='auto', target=target_lang)
-            translated_text = translator.translate(text)
-        except Exception as trans_error:
-            print(f"翻訳サービスエラー: {trans_error}")
-            return jsonify({"error": "翻訳サービスが利用できません"}), 503
+        # 翻訳機能は一時的に無効化し、テキストをそのまま返す
+        message = f"入力: '{text}' → {target_lang} (翻訳機能はテスト中のため無効)"
         
-        # gTTS 音声生成
-        try:
-            tts_lang = LANG_MAP.get(target_lang, "en")
-            audio_filename = f"{uuid.uuid4()}.mp3"
-            tts_path = os.path.join(STATIC_FOLDER, audio_filename)
-            
-            tts = gTTS(translated_text, lang=tts_lang)
-            tts.save(tts_path)
-            
-            # 音声ファイルのクリーンアップ
-            cleanup_audio_files()
-        except Exception as tts_error:
-            print(f"音声生成エラー: {tts_error}")
-            # 音声生成が失敗しても翻訳結果は返す
-            audio_filename = None
-        
-        # 履歴に追加
-        audio_path = f"/static/{audio_filename}" if audio_filename else None
-        add_to_history(text, translated_text, audio_path)
-        
-        response_data = {
-            "translated": translated_text
-        }
-        if audio_filename:
-            response_data["audio"] = f"/static/{audio_filename}"
-        
-        return jsonify(response_data)
+        return jsonify({"message": message})
         
     except Exception as e:
-        print(f"翻訳エラー: {e}")
-        return jsonify({"error": "翻訳中にエラーが発生しました"}), 500
-
-@app.route("/clear_history", methods=["POST"])
-def clear_history():
-    """履歴をクリア"""
-    session['translation_history'] = []
-    return jsonify({"success": True})
+        print(f"エラー: {e}")
+        return jsonify({"error": "処理中にエラーが発生しました"}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 5000))
