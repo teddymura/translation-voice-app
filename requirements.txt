@@ -1,5 +1,2 @@
 Flask==3.0.3
-deep-translator==1.11.4
-gtts==2.5.1
 gunicorn==21.2.0
-requests==2.31.0
