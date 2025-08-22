@@ -8,10 +8,7 @@ from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this')
-
 translator = Translator()
-# Whisperを一時的に削除
-# model = whisper.load_model("base")
 
 LANG_MAP = {
     "en": "en", "ja": "ja", "fr": "fr", "de": "de",
@@ -94,28 +91,41 @@ def translate_ajax():
         if not text:
             return jsonify({"error": "テキストが入力されていません"}), 400
         
-        # 翻訳
-        translated = translator.translate(text, dest=target_lang)
-        translated_text = translated.text
-
+        # 翻訳（エラーハンドリング強化）
+        try:
+            translated = translator.translate(text, dest=target_lang)
+            translated_text = translated.text
+        except Exception as trans_error:
+            print(f"翻訳サービスエラー: {trans_error}")
+            return jsonify({"error": "翻訳サービスが利用できません"}), 503
+        
         # gTTS 音声生成
-        tts_lang = LANG_MAP.get(target_lang, "en")
-        audio_filename = f"{uuid.uuid4()}.mp3"
-        tts_path = os.path.join(STATIC_FOLDER, audio_filename)
-        
-        tts = gTTS(translated_text, lang=tts_lang)
-        tts.save(tts_path)
-        
-        # 音声ファイルのクリーンアップ
-        cleanup_audio_files()
+        try:
+            tts_lang = LANG_MAP.get(target_lang, "en")
+            audio_filename = f"{uuid.uuid4()}.mp3"
+            tts_path = os.path.join(STATIC_FOLDER, audio_filename)
+            
+            tts = gTTS(translated_text, lang=tts_lang)
+            tts.save(tts_path)
+            
+            # 音声ファイルのクリーンアップ
+            cleanup_audio_files()
+        except Exception as tts_error:
+            print(f"音声生成エラー: {tts_error}")
+            # 音声生成が失敗しても翻訳結果は返す
+            audio_filename = None
         
         # 履歴に追加
-        add_to_history(text, translated_text, f"/static/{audio_filename}")
+        audio_path = f"/static/{audio_filename}" if audio_filename else None
+        add_to_history(text, translated_text, audio_path)
         
-        return jsonify({
-            "translated": translated_text,
-            "audio": f"/static/{audio_filename}"
-        })
+        response_data = {
+            "translated": translated_text
+        }
+        if audio_filename:
+            response_data["audio"] = f"/static/{audio_filename}"
+        
+        return jsonify(response_data)
         
     except Exception as e:
         print(f"翻訳エラー: {e}")
