@@ -2,16 +2,16 @@ from flask import Flask, render_template, request, jsonify, session
 from googletrans import Translator
 from gtts import gTTS
 import os
-import whisper
 import uuid
 import glob
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-change-this'  # セッション用のシークレットキー
+app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this')
 
 translator = Translator()
-model = whisper.load_model("base")  # CPUでもOK
+# Whisperを一時的に削除
+# model = whisper.load_model("base")
 
 LANG_MAP = {
     "en": "en", "ja": "ja", "fr": "fr", "de": "de",
@@ -110,11 +110,11 @@ def translate_ajax():
         cleanup_audio_files()
         
         # 履歴に追加
-        add_to_history(text, translated_text, f"/{tts_path}")
+        add_to_history(text, translated_text, f"/static/{audio_filename}")
         
         return jsonify({
             "translated": translated_text,
-            "audio": f"/{tts_path}"
+            "audio": f"/static/{audio_filename}"
         })
         
     except Exception as e:
@@ -128,4 +128,5 @@ def clear_history():
     return jsonify({"success": True})
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host="0.0.0.0", port=port)
