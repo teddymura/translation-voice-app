@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>翻訳＋音声アプリ</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            text-align: center;
+            color: #4a5568;
+            margin-bottom: 30px;
+            font-size: clamp(1.5rem, 4vw, 2.2rem);
+            font-weight: 700;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2d3748;
+            font-size: 16px;
+        }
+
+        .input-container {
+            position: relative;
+            display: flex;
+            align-items: stretch;
+        }
+
+        .mic-btn {
+            position: absolute;
+            right: 12px;
+            top: 12px;
+            width: 48px;
+            height: 48px;
+            border: none;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            z-index: 10;
+        }
+
+        .mic-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .mic-btn:active {
+            transform: scale(0.95);
+        }
+
+        .mic-btn.recording {
+            background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+            animation: recordingPulse 1.5s ease-in-out infinite;
+        }
+
+        .recording-status {
+            margin-top: 10px;
+            padding: 12px 16px;
+            background: rgba(229, 62, 62, 0.1);
+            border: 2px solid rgba(229, 62, 62, 0.3);
+            border-radius: 12px;
+            color: #c53030;
+            font-weight: 600;
+        }
+
+        .recording-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pulse {
+            width: 12px;
+            height: 12px;
+            background: #e53e3e;
+            border-radius: 50%;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes recordingPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        textarea {
+            width: 100%;
+            padding: 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 120px;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            background: #fff;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        select {
+            width: 100%;
+            padding: 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 16px;
+            background: #fff;
+            cursor: pointer;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L2 4h8z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.3s ease;
+            margin-top: 10px;
+            touch-action: manipulation;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .result-section {
+            margin-top: 40px;
+            padding: 25px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .result-section h2 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-size: 1.4rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .result-text {
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            font-size: 16px;
+            line-height: 1.7;
+            border-left: 4px solid #667eea;
+            margin-bottom: 20px;
+            word-wrap: break-word;
+        }
+
+        .audio-section {
+            margin-top: 20px;
+        }
+
+        .audio-section h3 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        audio {
+            width: 100%;
+            border-radius: 8px;
+            outline: none;
+        }
+
+        /* 履歴表示スタイル */
+        .history {
+            margin-top: 30px;
+            padding: 25px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .history h3 {
+            color: #2d3748;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .history-entry {
+            background: #fff;
+            padding: 18px;
+            margin-bottom: 15px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            border-left: 4px solid #764ba2;
+        }
+
+        .history-entry:last-child {
+            margin-bottom: 0;
+        }
+
+        .history-item {
+            margin-bottom: 12px;
+        }
+
+        .history-item strong {
+            color: #2d3748;
+            font-weight: 600;
+        }
+
+        .history-item-content {
+            background: #f7fafc;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-top: 5px;
+            border-left: 3px solid #e2e8f0;
+            word-wrap: break-word;
+        }
+
+        .history audio {
+            margin-top: 10px;
+        }
+
+        /* アイコン用のスタイル */
+        .icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* ローディング状態 */
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            border-top: 2px solid transparent;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* スマホでのタッチ操作改善 */
+        @media (hover: none) and (pointer: coarse) {
+            .submit-btn:hover {
+                transform: none;
+                box-shadow: none;
+            }
+        }
+
+        /* 小さな画面での調整 */
+        @media (max-width: 480px) {
+            body {
+                padding: 15px;
+            }
+            
+            .container {
+                padding: 25px 15px;
+                border-radius: 16px;
+            }
+            
+            h1 {
+                font-size: 1.8rem;
+                margin-bottom: 25px;
+            }
+            
+            textarea, select, .submit-btn {
+                padding: 14px;
+                font-size: 16px; /* iOSのズーム防止 */
+            }
+            
+            .result-section, .history {
+                padding: 20px 15px;
+            }
+        }
+
+        /* 横向きモード対応 */
+        @media (orientation: landscape) and (max-height: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 20px 15px;
+            }
+            
+            h1 {
+                margin-bottom: 20px;
+            }
+            
+            .form-group {
+                margin-bottom: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 翻訳＋音声アプリ</h1>
+
+        <form method="post" id="translateForm">
+            <div class="form-group">
+                <label for="text">📝 翻訳したい文章:</label>
+                <div class="input-container">
+                    <textarea name="text" id="text" placeholder="ここに翻訳したい文章を入力してください..."></textarea>
+                    <button type="button" class="mic-btn" id="micBtn" title="音声入力">
+                        🎤
+                    </button>
+                </div>
+                <div class="recording-status" id="recordingStatus" style="display: none;">
+                    <div class="recording-indicator">
+                        <div class="pulse"></div>
+                        🔴 録音中... タップで停止
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="lang">🌍 翻訳先の言語:</label>
+                <select name="lang" id="lang">
+                    <option value="en">🇺🇸 英語</option>
+                    <option value="ja">🇯🇵 日本語</option>
+                    <option value="fr">🇫🇷 フランス語</option>
+                    <option value="de">🇩🇪 ドイツ語</option>
+                    <option value="it">🇮🇹 イタリア語</option>
+                    <option value="es">🇪🇸 スペイン語</option>
+                    <option value="ko">🇰🇷 韓国語</option>
+                    <option value="zh-cn">🇨🇳 中国語（簡体字）</option>
+                </select>
+            </div>
+
+            <button type="submit" class="submit-btn" id="submitBtn">
+                🚀 翻訳＆音声再生
+            </button>
+        </form>
+
+        <!-- 翻訳結果表示部分 -->
+        <h3>翻訳結果</h3>
+        <div id="result"></div>
+        <audio id="audioPlayer" controls style="display:none;"></audio>
+
+        <!-- 履歴表示部分 -->
+        <div class="history">
+            <h3>📚 履歴（最新5件）</h3>
+            {% for item in history %}
+            <div class="history-entry">
+                <div class="history-item">
+                    <strong>入力:</strong>
+                    <div class="history-item-content">{{ item.original }}</div>
+                </div>
+                <div class="history-item">
+                    <strong>翻訳:</strong>
+                    <div class="history-item-content">{{ item.translated }}</div>
+                </div>
+                {% if item.audio %}
+                <audio controls>
+                    <source src="{{ item.audio }}" type="audio/mpeg">
+                    ブラウザが audio タグに対応していません。
+                </audio>
+                {% endif %}
+            </div>
+            {% endfor %}
+            
+            {% if not history %}
+            <div style="text-align: center; color: #718096; padding: 20px;">
+                まだ履歴がありません
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        // フォーム送信をAjaxで処理
+        $("#translateForm").submit(function(e){
+            e.preventDefault();
+            const submitBtn = $('#submitBtn');
+            submitBtn.addClass('loading').text('翻訳中...');
+            
+            $.post("/translate", $(this).serialize(), function(data){
+                $("#result").html(`<div class="result-text">${data.translated}</div>`);
+                if (data.audio) {
+                    const audioPlayer = $("#audioPlayer")[0];
+                    audioPlayer.src = data.audio;
+                    audioPlayer.style.display = 'block';
+                    
+                    // 音声ファイルの読み込みを待ってから再生
+                    audioPlayer.addEventListener('canplaythrough', function() {
+                        audioPlayer.play().catch(function(error) {
+                            console.log("自動再生できませんでした:", error);
+                        });
+                    }, { once: true });
+                    
+                    // 既に読み込まれている場合は即座に再生
+                    if (audioPlayer.readyState >= 3) {
+                        audioPlayer.play().catch(function(error) {
+                            console.log("自動再生できませんでした:", error);
+                        });
+                    }
+                }
+                
+                // 履歴を動的に更新（リロードなし）
+                loadHistory();
+                
+                // フォームをクリア
+                $("#text").val('');
+                
+            }).fail(function() {
+                $("#result").html('<div class="result-text" style="color: red;">翻訳に失敗しました</div>');
+            }).always(function() {
+                submitBtn.removeClass('loading').text('🚀 翻訳＆音声再生');
+            });
+        });
+
+        // 履歴を動的に読み込む関数
+        function loadHistory() {
+            $.get("/get_history", function(data) {
+                const historyContainer = $(".history");
+                const historyContent = data.history.map(item => `
+                    <div class="history-entry">
+                        <div class="history-item">
+                            <strong>入力:</strong>
+                            <div class="history-item-content">${item.original}</div>
+                        </div>
+                        <div class="history-item">
+                            <strong>翻訳:</strong>
+                            <div class="history-item-content">${item.translated}</div>
+                        </div>
+                        ${item.audio ? `<audio controls><source src="${item.audio}" type="audio/mpeg">ブラウザが audio タグに対応していません。</audio>` : ''}
+                    </div>
+                `).join('');
+                
+                const historyHTML = `
+                    <h3>📚 履歴（最新5件）</h3>
+                    ${historyContent || '<div style="text-align: center; color: #718096; padding: 20px;">まだ履歴がありません</div>'}
+                `;
+                
+                historyContainer.html(historyHTML);
+            });
+        }
+
+        // DOMContentLoaded時の処理
+        window.addEventListener("DOMContentLoaded", () => {
+            // テキストエリアのリサイズ機能改善
+            const textarea = document.getElementById('text');
+            if (textarea) {
+                textarea.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = Math.max(120, this.scrollHeight) + 'px';
+                });
+            }
+        });
+
+        // 音声認識機能
+        let recognition = null;
+        let isRecording = false;
+
+        function initSpeechRecognition() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                console.log('音声認識がサポートされていません');
+                const micBtn = document.getElementById('micBtn');
+                if (micBtn) {
+                    micBtn.style.display = 'none';
+                }
+                return false;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'ja-JP'; // デフォルトは日本語
+
+            recognition.onstart = () => {
+                console.log('音声認識開始');
+                isRecording = true;
+                updateRecordingUI(true);
+            };
+
+            recognition.onresult = (event) => {
+                let finalTranscript = '';
+                let interimTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+
+                const textArea = document.getElementById('text');
+                if (textArea) {
+                    // 最終的な認識結果のみをテキストエリアに反映
+                    if (finalTranscript) {
+                        const currentText = textArea.value;
+                        textArea.value = currentText + finalTranscript;
+                        // テキストエリアのサイズ調整
+                        textArea.style.height = 'auto';
+                        textArea.style.height = Math.max(120, textArea.scrollHeight) + 'px';
+                    }
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error('音声認識エラー:', event.error);
+                isRecording = false;
+                updateRecordingUI(false);
+                
+                // エラーメッセージの表示
+                let errorMsg = '音声認識でエラーが発生しました';
+                switch(event.error) {
+                    case 'no-speech':
+                        errorMsg = '音声が検出されませんでした';
+                        break;
+                    case 'audio-capture':
+                        errorMsg = 'マイクにアクセスできません';
+                        break;
+                    case 'not-allowed':
+                        errorMsg = 'マイクの使用許可が必要です';
+                        break;
+                }
+                showToast(errorMsg);
+            };
+
+            recognition.onend = () => {
+                console.log('音声認識終了');
+                isRecording = false;
+                updateRecordingUI(false);
+            };
+
+            return true;
+        }
+
+        function toggleRecording() {
+            if (!recognition) {
+                showToast('音声認識がサポートされていません');
+                return;
+            }
+
+            if (isRecording) {
+                recognition.stop();
+            } else {
+                recognition.start();
+            }
+        }
+
+        function updateRecordingUI(recording) {
+            const micBtn = document.getElementById('micBtn');
+            const recordingStatus = document.getElementById('recordingStatus');
+
+            if (recording) {
+                micBtn.classList.add('recording');
+                micBtn.innerHTML = '⏹️';
+                micBtn.title = '録音停止';
+                recordingStatus.style.display = 'block';
+            } else {
+                micBtn.classList.remove('recording');
+                micBtn.innerHTML = '🎤';
+                micBtn.title = '音声入力';
+                recordingStatus.style.display = 'none';
+            }
+        }
+
+        function showToast(message) {
+            // 簡単なトースト通知
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                z-index: 1000;
+                font-size: 14px;
+            `;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // マイクボタンのイベントリスナー
+        document.addEventListener('DOMContentLoaded', () => {
+            // 音声認識の初期化
+            initSpeechRecognition();
+
+            // マイクボタンのクリックイベント
+            const micBtn = document.getElementById('micBtn');
+            if (micBtn) {
+                micBtn.addEventListener('click', toggleRecording);
+            }
+        });
+
+        // タッチデバイスでの操作改善
+        document.addEventListener('touchstart', function() {}, {passive: true});
+    </script>
+</body>
+</html>
