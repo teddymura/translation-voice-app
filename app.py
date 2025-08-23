@@ -1,136 +1,149 @@
 from flask import Flask, render_template, request, jsonify, session
-from deep_translator import GoogleTranslator, MicrosoftTranslator, LibreTranslator
 import os
 from datetime import datetime
-import time
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-this')
+
+# 基本的な翻訳辞書
+TRANSLATION_DICT = {
+    'en': {
+        'hello': {'ja': 'こんにちは', 'fr': 'bonjour', 'de': 'hallo', 'es': 'hola', 'it': 'ciao', 'ko': '안녕하세요', 'zh': '你好'},
+        'thank you': {'ja': 'ありがとう', 'fr': 'merci', 'de': 'danke', 'es': 'gracias', 'it': 'grazie', 'ko': '감사합니다', 'zh': '谢谢'},
+        'good morning': {'ja': 'おはよう', 'fr': 'bonjour', 'de': 'guten morgen', 'es': 'buenos días', 'it': 'buongiorno', 'ko': '좋은 아침', 'zh': '早上好'},
+        'good night': {'ja': 'おやすみ', 'fr': 'bonne nuit', 'de': 'gute nacht', 'es': 'buenas noches', 'it': 'buonanotte', 'ko': '좋은 밤', 'zh': '晚安'},
+        'yes': {'ja': 'はい', 'fr': 'oui', 'de': 'ja', 'es': 'sí', 'it': 'sì', 'ko': '네', 'zh': '是'},
+        'no': {'ja': 'いいえ', 'fr': 'non', 'de': 'nein', 'es': 'no', 'it': 'no', 'ko': '아니오', 'zh': '不'},
+        'please': {'ja': 'お願いします', 'fr': 's\'il vous plaît', 'de': 'bitte', 'es': 'por favor', 'it': 'per favore', 'ko': '제발', 'zh': '请'},
+        'sorry': {'ja': 'すみません', 'fr': 'désolé', 'de': 'entschuldigung', 'es': 'lo siento', 'it': 'scusa', 'ko': '미안해요', 'zh': '对不起'},
+        'love': {'ja': '愛', 'fr': 'amour', 'de': 'liebe', 'es': 'amor', 'it': 'amore', 'ko': '사랑', 'zh': '爱'},
+        'water': {'ja': '水', 'fr': 'eau', 'de': 'wasser', 'es': 'agua', 'it': 'acqua', 'ko': '물', 'zh': '水'},
+        'food': {'ja': '食べ物', 'fr': 'nourriture', 'de': 'essen', 'es': 'comida', 'it': 'cibo', 'ko': '음식', 'zh': '食物'},
+        'beautiful': {'ja': '美しい', 'fr': 'beau', 'de': 'schön', 'es': 'hermoso', 'it': 'bello', 'ko': '아름다운', 'zh': '美丽'},
+        'happy': {'ja': '幸せ', 'fr': 'heureux', 'de': 'glücklich', 'es': 'feliz', 'it': 'felice', 'ko': '행복한', 'zh': '快乐'},
+        'cat': {'ja': '猫', 'fr': 'chat', 'de': 'katze', 'es': 'gato', 'it': 'gatto', 'ko': '고양이', 'zh': '猫'},
+        'dog': {'ja': '犬', 'fr': 'chien', 'de': 'hund', 'es': 'perro', 'it': 'cane', 'ko': '개', 'zh': '狗'},
+        'house': {'ja': '家', 'fr': 'maison', 'de': 'haus', 'es': 'casa', 'it': 'casa', 'ko': '집', 'zh': '房子'},
+        'friend': {'ja': '友達', 'fr': 'ami', 'de': 'freund', 'es': 'amigo', 'it': 'amico', 'ko': '친구', 'zh': '朋友'},
+        'family': {'ja': '家族', 'fr': 'famille', 'de': 'familie', 'es': 'familia', 'it': 'famiglia', 'ko': '가족', 'zh': '家庭'},
+        'time': {'ja': '時間', 'fr': 'temps', 'de': 'zeit', 'es': 'tiempo', 'it': 'tempo', 'ko': '시간', 'zh': '时间'},
+        'money': {'ja': 'お金', 'fr': 'argent', 'de': 'geld', 'es': 'dinero', 'it': 'denaro', 'ko': '돈', 'zh': '钱'},
+        'work': {'ja': '仕事', 'fr': 'travail', 'de': 'arbeit', 'es': 'trabajo', 'it': 'lavoro', 'ko': '일', 'zh': '工作'},
+        'school': {'ja': '学校', 'fr': 'école', 'de': 'schule', 'es': 'escuela', 'it': 'scuola', 'ko': '학교', 'zh': '学校'}
+    },
+    'ja': {
+        'こんにちは': {'en': 'hello', 'fr': 'bonjour', 'de': 'hallo', 'es': 'hola', 'it': 'ciao', 'ko': '안녕하세요', 'zh': '你好'},
+        'ありがとう': {'en': 'thank you', 'fr': 'merci', 'de': 'danke', 'es': 'gracias', 'it': 'grazie', 'ko': '감사합니다', 'zh': '谢谢'},
+        'おはよう': {'en': 'good morning', 'fr': 'bonjour', 'de': 'guten morgen', 'es': 'buenos días', 'it': 'buongiorno', 'ko': '좋은 아침', 'zh': '早上好'},
+        'はい': {'en': 'yes', 'fr': 'oui', 'de': 'ja', 'es': 'sí', 'it': 'sì', 'ko': '네', 'zh': '是'},
+        'いいえ': {'en': 'no', 'fr': 'non', 'de': 'nein', 'es': 'no', 'it': 'no', 'ko': '아니오', 'zh': '不'},
+        '愛': {'en': 'love', 'fr': 'amour', 'de': 'liebe', 'es': 'amor', 'it': 'amore', 'ko': '사랑', 'zh': '爱'},
+        '猫': {'en': 'cat', 'fr': 'chat', 'de': 'katze', 'es': 'gato', 'it': 'gatto', 'ko': '고양이', 'zh': '猫'},
+        '犬': {'en': 'dog', 'fr': 'chien', 'de': 'hund', 'es': 'perro', 'it': 'cane', 'ko': '개', 'zh': '狗'},
+    }
+}
 
 def get_history():
     """セッションから履歴を取得"""
     return session.get('translation_history', [])
 
-def add_to_history(original, translated):
-    """履歴に新しい翻訳結果を追加（重複チェック付き）"""
+def add_to_history(original, translated, service="Dictionary"):
+    """履歴に新しい翻訳結果を追加"""
     history = get_history()
     
-    # 既に同じ翻訳結果が存在するかチェック
     for existing_entry in history:
         if (existing_entry['original'] == original and 
             existing_entry['translated'] == translated):
             return
     
-    # 新しいエントリを先頭に追加
     new_entry = {
         'original': original,
         'translated': translated,
+        'service': service,
         'timestamp': datetime.now().isoformat()
     }
     history.insert(0, new_entry)
+    history = history[:10]  # 10件まで保持
     
-    # 最新5件のみ保持
-    history = history[:5]
-    
-    # セッションに保存
     session['translation_history'] = history
     session.permanent = True
 
-def translate_with_fallback(text, target_lang):
-    """複数の翻訳サービスを試行"""
+def offline_translate(text, target_lang):
+    """オフライン辞書を使用した翻訳"""
+    text_lower = text.lower().strip()
     
-    # 1. Google翻訳を試行（少し待機時間を入れる）
-    try:
-        time.sleep(0.5)  # レート制限回避
-        translator = GoogleTranslator(source='auto', target=target_lang)
-        result = translator.translate(text)
-        if result and result.strip():
-            return result, "Google"
-    except Exception as e:
-        print(f"Google翻訳エラー: {e}")
+    # 英語から他言語への翻訳
+    if text_lower in TRANSLATION_DICT.get('en', {}):
+        translation = TRANSLATION_DICT['en'][text_lower].get(target_lang)
+        if translation:
+            return translation, "Dictionary (EN→" + target_lang.upper() + ")"
     
-    # 2. Microsoft翻訳を試行
-    try:
-        translator = MicrosoftTranslator(source='auto', target=target_lang)
-        result = translator.translate(text)
-        if result and result.strip():
-            return result, "Microsoft"
-    except Exception as e:
-        print(f"Microsoft翻訳エラー: {e}")
+    # 日本語から他言語への翻訳
+    if text in TRANSLATION_DICT.get('ja', {}):
+        translation = TRANSLATION_DICT['ja'][text].get(target_lang)
+        if translation:
+            return translation, "Dictionary (JA→" + target_lang.upper() + ")"
     
-    # 3. LibreTranslate を試行
-    try:
-        # 言語コード変換（LibreTranslateの形式に合わせる）
-        lang_mapping = {
-            'zh': 'zh-cn',
-            'ko': 'ko',
-            'ja': 'ja',
-            'en': 'en',
-            'fr': 'fr',
-            'de': 'de',
-            'es': 'es',
-            'it': 'it'
-        }
-        libre_lang = lang_mapping.get(target_lang, target_lang)
-        
-        translator = LibreTranslator(source='auto', target=libre_lang)
-        result = translator.translate(text)
-        if result and result.strip():
-            return result, "LibreTranslate"
-    except Exception as e:
-        print(f"LibreTranslate翻訳エラー: {e}")
-    
-    # 4. 簡易翻訳（辞書ベース）- 最後の手段
-    simple_translations = {
-        ('hello', 'ja'): 'こんにちは',
-        ('hello', 'fr'): 'bonjour',
-        ('hello', 'de'): 'hallo',
-        ('hello', 'es'): 'hola',
-        ('thank you', 'ja'): 'ありがとう',
-        ('good morning', 'ja'): 'おはよう',
-    }
-    
-    simple_key = (text.lower(), target_lang)
-    if simple_key in simple_translations:
-        return simple_translations[simple_key], "Simple"
+    # 部分マッチを試行
+    for lang in ['en', 'ja']:
+        for key, translations in TRANSLATION_DICT.get(lang, {}).items():
+            if text_lower in key or key in text_lower:
+                translation = translations.get(target_lang)
+                if translation:
+                    return f"{translation} (部分マッチ)", f"Dictionary ({lang.upper()}→{target_lang.upper()})"
     
     return None, None
 
 @app.route("/", methods=["GET"])
 def index():
     """メインページ表示"""
-    return '''
+    # 利用可能な単語リストを生成
+    available_words = []
+    for lang_dict in TRANSLATION_DICT.values():
+        available_words.extend(list(lang_dict.keys())[:10])  # 各言語から10個ずつ
+    
+    word_examples = ", ".join(available_words[:15])  # 最初の15個を表示
+    
+    return f'''
     <!DOCTYPE html>
     <html>
     <head>
-        <title>翻訳アプリ</title>
+        <title>翻訳アプリ (オフライン版)</title>
         <meta charset="utf-8">
         <style>
-            body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-            .container { background: #f9f9f9; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-            input, select, button { padding: 10px; margin: 5px; border: 1px solid #ccc; border-radius: 5px; }
-            input[type="text"] { width: 300px; }
-            button { background: #007bff; color: white; cursor: pointer; }
-            button:hover { background: #0056b3; }
-            .result { background: #e9f7ef; padding: 15px; border-radius: 5px; margin: 10px 0; }
-            .history { background: #fff; padding: 15px; border-radius: 5px; border: 1px solid #ddd; }
-            .history-item { border-bottom: 1px solid #eee; padding: 10px 0; }
-            .history-item:last-child { border-bottom: none; }
-            .service-info { font-size: 0.8em; color: #666; }
-            .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 5px; margin: 10px 0; }
+            body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }}
+            .container {{ background: #f9f9f9; padding: 20px; border-radius: 10px; margin-bottom: 20px; }}
+            input, select, button {{ padding: 10px; margin: 5px; border: 1px solid #ccc; border-radius: 5px; }}
+            input[type="text"] {{ width: 300px; }}
+            button {{ background: #007bff; color: white; cursor: pointer; }}
+            button:hover {{ background: #0056b3; }}
+            .result {{ background: #e9f7ef; padding: 15px; border-radius: 5px; margin: 10px 0; }}
+            .history {{ background: #fff; padding: 15px; border-radius: 5px; border: 1px solid #ddd; }}
+            .history-item {{ border-bottom: 1px solid #eee; padding: 10px 0; }}
+            .history-item:last-child {{ border-bottom: none; }}
+            .service-info {{ font-size: 0.8em; color: #666; }}
+            .info {{ background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 5px; margin: 10px 0; }}
+            .examples {{ background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 0.9em; }}
         </style>
     </head>
     <body>
-        <h1>🌐 翻訳アプリ</h1>
+        <h1>🌐 翻訳アプリ (オフライン辞書版)</h1>
         
-        <div class="warning">
-            <strong>注意:</strong> 翻訳サービスが一時的に不安定な場合があります。エラーが出る場合は少し時間をおいて再試行してください。
+        <div class="info">
+            <strong>📘 現在オフライン辞書モードで動作中</strong><br>
+            インターネット翻訳サービスが一時的に利用できないため、内蔵辞書を使用しています。<br>
+            基本的な単語や挨拶の翻訳が可能です。
+        </div>
+        
+        <div class="examples">
+            <strong>利用可能な単語例:</strong><br>
+            {word_examples}... など
         </div>
         
         <div class="container">
             <h3>翻訳する</h3>
             <form id="translateForm">
-                <input type="text" id="textInput" placeholder="翻訳したいテキストを入力" required>
+                <input type="text" id="textInput" placeholder="翻訳したい単語を入力 (例: hello, ありがとう)" required>
                 <select id="langSelect">
                     <option value="en">English</option>
                     <option value="ja">日本語</option>
@@ -153,75 +166,72 @@ def index():
         </div>
         
         <script>
-        // 翻訳フォームの処理
-        document.getElementById('translateForm').addEventListener('submit', function(e) {
+        document.getElementById('translateForm').addEventListener('submit', function(e) {{
             e.preventDefault();
             const text = document.getElementById('textInput').value;
             const lang = document.getElementById('langSelect').value;
             
-            document.getElementById('result').innerHTML = '<p>翻訳中... （複数のサービスを試行中）</p>';
+            document.getElementById('result').innerHTML = '<p>辞書を検索中...</p>';
             
-            fetch('/translate', {
+            fetch('/translate', {{
                 method: 'POST',
-                headers: {
+                headers: {{
                     'Content-Type': 'application/x-www-form-urlencoded',
-                },
+                }},
                 body: 'text=' + encodeURIComponent(text) + '&lang=' + lang
-            })
+            }})
             .then(response => response.json())
-            .then(data => {
-                if (data.error) {
+            .then(data => {{
+                if (data.error) {{
                     document.getElementById('result').innerHTML = 
                         '<p style="color: red;">エラー: ' + data.error + '</p>';
-                } else {
+                }} else {{
                     document.getElementById('result').innerHTML = 
                         '<div class="result">' +
                         '<h4>翻訳結果:</h4>' +
                         '<p>' + data.translated + '</p>' +
                         '<div class="service-info">翻訳元: ' + data.service + '</div>' +
                         '</div>';
-                    loadHistory(); // 履歴を更新
-                }
-            })
-            .catch(error => {
+                    loadHistory();
+                }}
+            }})
+            .catch(error => {{
                 document.getElementById('result').innerHTML = 
                     '<p style="color: red;">通信エラーが発生しました</p>';
-            });
-        });
+            }});
+        }});
 
-        // 履歴を読み込む
-        function loadHistory() {
+        function loadHistory() {{
             fetch('/get_history')
             .then(response => response.json())
-            .then(data => {
+            .then(data => {{
                 const historyList = document.getElementById('historyList');
-                if (data.history.length === 0) {
+                if (data.history.length === 0) {{
                     historyList.innerHTML = '<p>履歴がありません</p>';
-                } else {
+                }} else {{
                     historyList.innerHTML = data.history.map(item => 
                         '<div class="history-item">' +
                         '<strong>原文:</strong> ' + item.original + '<br>' +
-                        '<strong>翻訳:</strong> ' + item.translated +
+                        '<strong>翻訳:</strong> ' + item.translated + '<br>' +
+                        '<div class="service-info">' + item.service + '</div>' +
                         '</div>'
                     ).join('');
-                }
-            });
-        }
+                }}
+            }});
+        }}
 
-        // 履歴をクリア
-        function clearHistory() {
-            fetch('/clear_history', {
+        function clearHistory() {{
+            fetch('/clear_history', {{
                 method: 'POST'
-            })
+            }})
             .then(response => response.json())
-            .then(data => {
-                if (data.success) {
+            .then(data => {{
+                if (data.success) {{
                     loadHistory();
-                }
-            });
-        }
+                }}
+            }});
+        }}
 
-        // ページ読み込み時に履歴を表示
         loadHistory();
         </script>
     </body>
@@ -243,14 +253,14 @@ def translate_ajax():
         if not text:
             return jsonify({"error": "テキストが入力されていません"}), 400
         
-        # 複数サービスで翻訳を試行
-        translated_text, service = translate_with_fallback(text, target_lang)
+        # オフライン辞書で翻訳
+        translated_text, service = offline_translate(text, target_lang)
         
         if not translated_text:
-            return jsonify({"error": "すべての翻訳サービスが利用できません。しばらくしてから再試行してください。"}), 503
+            return jsonify({"error": f"「{text}」は辞書に登録されていません。利用可能な単語例を参照してください。"}), 404
         
         # 履歴に追加
-        add_to_history(text, translated_text)
+        add_to_history(text, translated_text, service)
         
         return jsonify({
             "translated": translated_text,
