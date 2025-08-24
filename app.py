@@ -1,5 +1,5 @@
 import streamlit as st
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 import gtts
 import io
 import base64
@@ -14,12 +14,14 @@ st.set_page_config(
 # タイトル
 st.title("🌍 多言語翻訳アプリ")
 
-# Google Translateのインスタンス
-@st.cache_resource
-def get_translator():
-    return Translator()
-
-translator = get_translator()
+# 翻訳関数
+def translate_text(text, src_lang, tgt_lang):
+    try:
+        translator = GoogleTranslator(source=src_lang, target=tgt_lang)
+        result = translator.translate(text)
+        return result
+    except Exception as e:
+        raise Exception(f"翻訳エラー: {str(e)}")
 
 # 言語選択
 col1, col2 = st.columns(2)
@@ -50,7 +52,7 @@ with col2:
             "de": "🇩🇪 Deutsch",
             "it": "🇮🇹 Italiano", 
             "zh": "🇨🇳 中文",
-            "ko": "🇰🇷 한국어"
+            "ko": "🇰🇷 한국語"
         }[x]
     )
 
@@ -68,8 +70,7 @@ if st.button("🔄 翻訳する", type="primary"):
             try:
                 # 翻訳実行
                 with st.spinner("翻訳中..."):
-                    result = translator.translate(input_text, src=src_lang, dest=tgt_lang)
-                    translated_text = result.text
+                    translated_text = translate_text(input_text, src_lang, tgt_lang)
                 
                 # 結果表示
                 st.success("✅ 翻訳完了！")
@@ -116,7 +117,7 @@ if st.button("🔄 翻訳する", type="primary"):
                     st.session_state.history = st.session_state.history[:5]
                     
             except Exception as e:
-                st.error(f"翻訳エラー: {e}")
+                st.error(str(e))
         else:
             st.warning("⚠️ 同じ言語が選択されています")
     else:
