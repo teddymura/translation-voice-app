@@ -72,32 +72,13 @@ if st.button("🔄 翻訳する", type="primary"):
                 with st.spinner("翻訳中..."):
                     translated_text = translate_text(input_text, src_lang, tgt_lang)
                 
-                # 結果表示
-                st.success("✅ 翻訳完了！")
-                
-                col1, col2 = st.columns([3, 1])
-                
-                with col1:
-                    st.text_area(
-                        "翻訳結果",
-                        value=translated_text,
-                        height=100,
-                        disabled=True
-                    )
-                
-                with col2:
-                    # 音声生成ボタン
-                    if st.button("🔊 音声再生"):
-                        try:
-                            tts = gtts.gTTS(text=translated_text, lang=tgt_lang, slow=False)
-                            mp3_fp = io.BytesIO()
-                            tts.write_to_fp(mp3_fp)
-                            mp3_fp.seek(0)
-                            
-                            # 音声プレイヤー
-                            st.audio(mp3_fp.read(), format='audio/mp3')
-                        except Exception as e:
-                            st.error(f"音声生成エラー: {e}")
+                # セッション状態に結果を保存
+                st.session_state.current_translation = {
+                    'original': input_text,
+                    'translated': translated_text,
+                    'src_lang': src_lang,
+                    'tgt_lang': tgt_lang
+                }
                 
                 # 履歴に追加
                 if 'history' not in st.session_state:
@@ -122,6 +103,58 @@ if st.button("🔄 翻訳する", type="primary"):
             st.warning("⚠️ 同じ言語が選択されています")
     else:
         st.warning("⚠️ テキストを入力してください")
+
+# 翻訳結果の表示
+if 'current_translation' in st.session_state:
+    st.success("✅ 翻訳完了！")
+    
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        st.text_area(
+            "翻訳結果",
+            value=st.session_state.current_translation['translated'],
+            height=100,
+            disabled=True
+        )
+    
+    with col2:
+        # 音声生成ボタン
+        if st.button("🔊 音声再生"):
+            try:
+                with st.spinner("音声生成中..."):
+                    tts = gtts.gTTS(
+                        text=st.session_state.current_translation['translated'], 
+                        lang=st.session_state.current_translation['tgt_lang'], 
+                        slow=False
+                    )
+                    mp3_fp = io.BytesIO()
+                    tts.write_to_fp(mp3_fp)
+                    mp3_fp.seek(0)
+                    
+                    # 音声プレイヤー
+                    st.audio(mp3_fp.read(), format='audio/mp3', autoplay=True)
+                    st.success("🎵 音声を生成しました")
+            except Exception as e:
+                st.error(f"音声生成エラー: {str(e)}")
+        
+        # 音声を自動生成するオプション
+        if st.checkbox("自動音声生成"):
+            try:
+                with st.spinner("音声生成中..."):
+                    tts = gtts.gTTS(
+                        text=st.session_state.current_translation['translated'], 
+                        lang=st.session_state.current_translation['tgt_lang'], 
+                        slow=False
+                    )
+                    mp3_fp = io.BytesIO()
+                    tts.write_to_fp(mp3_fp)
+                    mp3_fp.seek(0)
+                    
+                    # 音声プレイヤー
+                    st.audio(mp3_fp.read(), format='audio/mp3')
+            except Exception as e:
+                st.error(f"音声生成エラー: {str(e)}")
 
 # 履歴表示
 if 'history' in st.session_state and st.session_state.history:
