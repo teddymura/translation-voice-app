@@ -173,6 +173,23 @@ if 'history' in st.session_state and st.session_state.history:
                     disabled=True,
                     key=f"orig_{i}"
                 )
+                # 原文の音声ボタン
+                if st.button(f"🔊 原文音声", key=f"orig_audio_{i}"):
+                    try:
+                        with st.spinner("音声生成中..."):
+                            tts = gtts.gTTS(
+                                text=item['original'], 
+                                lang=item['src_lang'], 
+                                slow=False
+                            )
+                            mp3_fp = io.BytesIO()
+                            tts.write_to_fp(mp3_fp)
+                            mp3_fp.seek(0)
+                            
+                            st.audio(mp3_fp.read(), format='audio/mp3')
+                            st.success("🎵 原文音声を生成しました")
+                    except Exception as e:
+                        st.error(f"音声生成エラー: {str(e)}")
             
             with col2:
                 st.text_area(
@@ -182,6 +199,23 @@ if 'history' in st.session_state and st.session_state.history:
                     disabled=True,
                     key=f"trans_{i}"
                 )
+                # 翻訳文の音声ボタン
+                if st.button(f"🔊 翻訳音声", key=f"trans_audio_{i}"):
+                    try:
+                        with st.spinner("音声生成中..."):
+                            tts = gtts.gTTS(
+                                text=item['translated'], 
+                                lang=item['tgt_lang'], 
+                                slow=False
+                            )
+                            mp3_fp = io.BytesIO()
+                            tts.write_to_fp(mp3_fp)
+                            mp3_fp.seek(0)
+                            
+                            st.audio(mp3_fp.read(), format='audio/mp3')
+                            st.success("🎵 翻訳音声を生成しました")
+                    except Exception as e:
+                        st.error(f"音声生成エラー: {str(e)}")
 
 # サイドバー
 with st.sidebar:
@@ -196,9 +230,10 @@ with st.sidebar:
     st.markdown("## ✨ 特徴")
     st.markdown("""
     - 🌍 7言語対応
-    - 🔊 音声読み上げ
+    - 🔊 音声読み上げ（現在の翻訳＆履歴）
     - 📝 履歴管理（5件）
     - ⚡ 高速翻訳
+    - 🎵 原文・翻訳文両方の音声対応
     """)
     
     if st.button("🗑️ 履歴をクリア"):
