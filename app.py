@@ -9,6 +9,9 @@ import base64
 
 app = Flask(__name__)
 
+# より軽量なモデルを使用
+MODEL_NAME = "facebook/nllb-200-distilled-600M"
+
 # 言語コードマッピング（HTMLの短縮形 → NLLBの正式コード）
 LANG_MAPPING = {
     'en': 'eng_Latn',
@@ -43,9 +46,11 @@ def get_translator(src_lang, tgt_lang):
     if key not in translators:
         translators[key] = pipeline(
             "translation", 
-            model="facebook/nllb-200-distilled-600M",
+            model=MODEL_NAME,
             src_lang=LANG_MAPPING[src_lang],
-            tgt_lang=LANG_MAPPING[tgt_lang]
+            tgt_lang=LANG_MAPPING[tgt_lang],
+            max_length=512,  # メモリ使用量を制限
+            device=-1  # CPUを強制使用
         )
     return translators[key]
 
