@@ -124,5 +124,5 @@ def clear_history():
     return jsonify({"message": "履歴をクリアしました"})
 
 if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 10000))
+    port = int(os.environ.get('PORT', 10000))  # Render.comのデフォルトポート
     app.run(debug=False, host="0.0.0.0", port=port)
