@@ -48,12 +48,20 @@ def generate_audio(text, lang_code):
         # 言語コード変換
         tts_lang = get_tts_lang_code(lang_code)
         
-        # 文字数制限（gTTSの制限対策）
-        if len(text) > 500:
-            text = text[:500] + "..."
+        # iOS対策：文字数制限とテキスト正規化
+        text = text.strip()
+        if len(text) > 200:  # より短く制限
+            text = text[:200] + "..."
+        
+        # 特殊文字の処理（iOS対策）
+        import re
+        text = re.sub(r'[^\w\s\.\,\!\?\-]', '', text)
+        
+        if not text.strip():
+            raise Exception("有効なテキストがありません")
         
         # 音声生成
-        tts = gtts.gTTS(text=text, lang=tts_lang, slow=False)
+        tts = gtts.gTTS(text=text, lang=tts_lang, slow=False, lang_check=False)
         mp3_fp = io.BytesIO()
         tts.write_to_fp(mp3_fp)
         mp3_fp.seek(0)
@@ -61,6 +69,11 @@ def generate_audio(text, lang_code):
         return mp3_fp
     except Exception as e:
         raise Exception(f"音声生成に失敗しました: {str(e)}")
+
+# iOS判定関数
+def is_ios_device():
+    """ユーザーエージェントからiOSデバイスかどうか判定（簡易版）"""
+    return False  # サーバーサイドでは正確な判定が困難なため、常にFalseを返す
 
 # 言語選択
 col1, col2 = st.columns(2)
@@ -158,6 +171,9 @@ if 'current_translation' in st.session_state:
         )
     
     with col2:
+        # iOS対策：音声機能の説明を追加
+        st.info("📱 iOS端末をご利用の場合、音声再生にはブラウザの制限があります")
+        
         # 音声生成ボタン
         if st.button("🔊 音声再生"):
             try:
@@ -167,14 +183,23 @@ if 'current_translation' in st.session_state:
                         st.session_state.current_translation['tgt_lang']
                     )
                     
-                    # 音声プレイヤー
-                    st.audio(mp3_fp.read(), format='audio/mp3', autoplay=True)
-                    st.success("🎵 音声を生成しました")
+                    # 音声ファイル情報を表示
+                    audio_data = mp3_fp.read()
+                    st.success(f"🎵 音声を生成しました ({len(audio_data)} bytes)")
+                    
+                    # 音声プレイヤー（iOS対策：autoplayを削除）
+                    st.audio(audio_data, format='audio/mp3')
+                    
+                    # iOS用の追加説明
+                    st.caption("🔸 iOS端末の場合は、音声プレイヤーの再生ボタンを手動でタップしてください")
+                    
             except Exception as e:
                 st.error(f"音声生成エラー: {str(e)}")
+                # デバッグ情報を表示
+                st.caption(f"エラー詳細: 言語={st.session_state.current_translation['tgt_lang']}, テキスト長={len(st.session_state.current_translation['translated'])}")
         
-        # 音声を自動生成するオプション
-        if st.checkbox("自動音声生成"):
+        # 音声を自動生成するオプション（iOS対策で名称変更）
+        if st.checkbox("翻訳時に音声も生成"):
             try:
                 with st.spinner("音声生成中..."):
                     mp3_fp = generate_audio(
@@ -183,7 +208,9 @@ if 'current_translation' in st.session_state:
                     )
                     
                     # 音声プレイヤー
-                    st.audio(mp3_fp.read(), format='audio/mp3')
+                    audio_data = mp3_fp.read()
+                    st.audio(audio_data, format='audio/mp3')
+                    st.caption("🔸 音声プレイヤーの再生ボタンをタップしてください")
             except Exception as e:
                 st.error(f"音声生成エラー: {str(e)}")
 
@@ -209,8 +236,10 @@ if 'history' in st.session_state and st.session_state.history:
                     try:
                         with st.spinner("音声生成中..."):
                             mp3_fp = generate_audio(item['original'], item['src_lang'])
-                            st.audio(mp3_fp.read(), format='audio/mp3')
+                            audio_data = mp3_fp.read()
+                            st.audio(audio_data, format='audio/mp3')
                             st.success("🎵 原文音声を生成しました")
+                            st.caption("🔸 再生ボタンをタップしてください")
                     except Exception as e:
                         st.error(f"音声生成エラー: {str(e)}")
             
@@ -227,8 +256,10 @@ if 'history' in st.session_state and st.session_state.history:
                     try:
                         with st.spinner("音声生成中..."):
                             mp3_fp = generate_audio(item['translated'], item['tgt_lang'])
-                            st.audio(mp3_fp.read(), format='audio/mp3')
+                            audio_data = mp3_fp.read()
+                            st.audio(audio_data, format='audio/mp3')
                             st.success("🎵 翻訳音声を生成しました")
+                            st.caption("🔸 再生ボタンをタップしてください")
                     except Exception as e:
                         st.error(f"音声生成エラー: {str(e)}")
 
