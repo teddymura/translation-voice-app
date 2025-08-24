@@ -1,4 +1,4 @@
-Flask==3.0.3
-gunicorn==21.2.0
-deep-translator==1.11.4
-requests==2.31.0
+flask
+transformers>=4.21.0
+torch>=1.13.1
+gtts>=2.3.0
