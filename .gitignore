@@ -1,3 +1,5 @@
+# Streamlit
+.streamlit/
 txt# 環境設定（機密情報）
 .env
 
