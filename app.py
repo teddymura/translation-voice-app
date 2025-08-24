@@ -2,26 +2,15 @@ import os
 import json
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify
-from transformers import pipeline
+from googletrans import Translator
 import gtts
 import io
 import base64
 
 app = Flask(__name__)
 
-# より軽量なモデルを使用
-MODEL_NAME = "facebook/nllb-200-distilled-600M"
-
-# 言語コードマッピング（HTMLの短縮形 → NLLBの正式コード）
-LANG_MAPPING = {
-    'en': 'eng_Latn',
-    'ja': 'jpn_Jpan',
-    'fr': 'fra_Latn',
-    'de': 'deu_Latn', 
-    'it': 'ita_Latn',
-    'zh': 'zho_Hans',
-    'ko': 'kor_Hang'
-}
+# Google Translateのインスタンス
+translator = Translator()
 
 # gTTSでサポートされている言語コード
 GTTS_LANG_MAPPING = {
@@ -34,25 +23,8 @@ GTTS_LANG_MAPPING = {
     'ko': 'ko'
 }
 
-# 翻訳パイプライン（動的に作成するため、ここでは定義しない）
-translators = {}
-
 # 翻訳履歴を保存するリスト（最大5件）
 translation_history = []
-
-def get_translator(src_lang, tgt_lang):
-    """翻訳パイプラインを取得（キャッシュ機能付き）"""
-    key = f"{src_lang}-{tgt_lang}"
-    if key not in translators:
-        translators[key] = pipeline(
-            "translation", 
-            model=MODEL_NAME,
-            src_lang=LANG_MAPPING[src_lang],
-            tgt_lang=LANG_MAPPING[tgt_lang],
-            max_length=512,  # メモリ使用量を制限
-            device=-1  # CPUを強制使用
-        )
-    return translators[key]
 
 def generate_speech(text, lang_code):
     """音声データを生成してBase64エンコード"""
@@ -112,9 +84,6 @@ def translate():
         if not text:
             return jsonify({"error": "テキストが入力されていません"}), 400
             
-        if src not in LANG_MAPPING or tgt not in LANG_MAPPING:
-            return jsonify({"error": "サポートされていない言語です"}), 400
-            
         if src == tgt:
             audio_data = generate_speech(text, src)
             add_to_history(text, text, src, tgt, audio_data)
@@ -123,10 +92,9 @@ def translate():
                 "audio": audio_data
             })
             
-        # 翻訳実行
-        translator = get_translator(src, tgt)
-        result = translator(text)
-        translated_text = result[0]['translation_text']
+        # Google Translateで翻訳実行
+        result = translator.translate(text, src=src, dest=tgt)
+        translated_text = result.text
         
         # 音声生成
         audio_data = generate_speech(translated_text, tgt)
@@ -156,5 +124,5 @@ def clear_history():
     return jsonify({"message": "履歴をクリアしました"})
 
 if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 5000))
-    app.run(debug=True, host="0.0.0.0", port=port)
+    port = int(os.environ.get('PORT', 10000))
+    app.run(debug=False, host="0.0.0.0", port=port)
