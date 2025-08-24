@@ -23,6 +23,45 @@ def translate_text(text, src_lang, tgt_lang):
     except Exception as e:
         raise Exception(f"翻訳エラー: {str(e)}")
 
+# gTTS用の言語コード変換
+def get_tts_lang_code(lang_code):
+    """gTTSで使用する言語コードに変換"""
+    lang_mapping = {
+        'zh': 'zh-cn',  # 中国語（簡体字）
+        'ja': 'ja',
+        'en': 'en', 
+        'fr': 'fr',
+        'de': 'de',
+        'it': 'it',
+        'ko': 'ko'
+    }
+    return lang_mapping.get(lang_code, 'en')  # デフォルトは英語
+
+# 安全な音声生成関数
+def generate_audio(text, lang_code):
+    """安全に音声を生成する"""
+    try:
+        # 空文字チェック
+        if not text or not text.strip():
+            raise Exception("音声生成するテキストが空です")
+        
+        # 言語コード変換
+        tts_lang = get_tts_lang_code(lang_code)
+        
+        # 文字数制限（gTTSの制限対策）
+        if len(text) > 500:
+            text = text[:500] + "..."
+        
+        # 音声生成
+        tts = gtts.gTTS(text=text, lang=tts_lang, slow=False)
+        mp3_fp = io.BytesIO()
+        tts.write_to_fp(mp3_fp)
+        mp3_fp.seek(0)
+        
+        return mp3_fp
+    except Exception as e:
+        raise Exception(f"音声生成に失敗しました: {str(e)}")
+
 # 言語選択
 col1, col2 = st.columns(2)
 
@@ -123,14 +162,10 @@ if 'current_translation' in st.session_state:
         if st.button("🔊 音声再生"):
             try:
                 with st.spinner("音声生成中..."):
-                    tts = gtts.gTTS(
-                        text=st.session_state.current_translation['translated'], 
-                        lang=st.session_state.current_translation['tgt_lang'], 
-                        slow=False
+                    mp3_fp = generate_audio(
+                        st.session_state.current_translation['translated'],
+                        st.session_state.current_translation['tgt_lang']
                     )
-                    mp3_fp = io.BytesIO()
-                    tts.write_to_fp(mp3_fp)
-                    mp3_fp.seek(0)
                     
                     # 音声プレイヤー
                     st.audio(mp3_fp.read(), format='audio/mp3', autoplay=True)
@@ -142,14 +177,10 @@ if 'current_translation' in st.session_state:
         if st.checkbox("自動音声生成"):
             try:
                 with st.spinner("音声生成中..."):
-                    tts = gtts.gTTS(
-                        text=st.session_state.current_translation['translated'], 
-                        lang=st.session_state.current_translation['tgt_lang'], 
-                        slow=False
+                    mp3_fp = generate_audio(
+                        st.session_state.current_translation['translated'],
+                        st.session_state.current_translation['tgt_lang']
                     )
-                    mp3_fp = io.BytesIO()
-                    tts.write_to_fp(mp3_fp)
-                    mp3_fp.seek(0)
                     
                     # 音声プレイヤー
                     st.audio(mp3_fp.read(), format='audio/mp3')
@@ -177,15 +208,7 @@ if 'history' in st.session_state and st.session_state.history:
                 if st.button(f"🔊 原文音声", key=f"orig_audio_{i}"):
                     try:
                         with st.spinner("音声生成中..."):
-                            tts = gtts.gTTS(
-                                text=item['original'], 
-                                lang=item['src_lang'], 
-                                slow=False
-                            )
-                            mp3_fp = io.BytesIO()
-                            tts.write_to_fp(mp3_fp)
-                            mp3_fp.seek(0)
-                            
+                            mp3_fp = generate_audio(item['original'], item['src_lang'])
                             st.audio(mp3_fp.read(), format='audio/mp3')
                             st.success("🎵 原文音声を生成しました")
                     except Exception as e:
@@ -203,15 +226,7 @@ if 'history' in st.session_state and st.session_state.history:
                 if st.button(f"🔊 翻訳音声", key=f"trans_audio_{i}"):
                     try:
                         with st.spinner("音声生成中..."):
-                            tts = gtts.gTTS(
-                                text=item['translated'], 
-                                lang=item['tgt_lang'], 
-                                slow=False
-                            )
-                            mp3_fp = io.BytesIO()
-                            tts.write_to_fp(mp3_fp)
-                            mp3_fp.seek(0)
-                            
+                            mp3_fp = generate_audio(item['translated'], item['tgt_lang'])
                             st.audio(mp3_fp.read(), format='audio/mp3')
                             st.success("🎵 翻訳音声を生成しました")
                     except Exception as e:
