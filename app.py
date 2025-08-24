@@ -1,86 +1,172 @@
-import os
-from datetime import datetime
-from flask import Flask, render_template, request, jsonify
+import streamlit as st
 from googletrans import Translator
+import gtts
+import io
+import base64
 
-app = Flask(__name__)
+# ページ設定
+st.set_page_config(
+    page_title="🌍 翻訳アプリ",
+    page_icon="🌍",
+    layout="wide"
+)
+
+# タイトル
+st.title("🌍 多言語翻訳アプリ")
 
 # Google Translateのインスタンス
-translator = Translator()
+@st.cache_resource
+def get_translator():
+    return Translator()
 
-# 翻訳履歴を保存するリスト（最大5件）
-translation_history = []
+translator = get_translator()
 
-def add_to_history(original, translated, src_lang, tgt_lang):
-    """翻訳履歴に追加（最大5件まで保持）"""
-    global translation_history
+# 言語選択
+col1, col2 = st.columns(2)
+
+with col1:
+    src_lang = st.selectbox(
+        "翻訳元の言語",
+        ["en", "ja", "fr", "de", "it", "zh", "ko"],
+        format_func=lambda x: {
+            "en": "🇺🇸 English", 
+            "ja": "🇯🇵 日本語",
+            "fr": "🇫🇷 Français", 
+            "de": "🇩🇪 Deutsch",
+            "it": "🇮🇹 Italiano", 
+            "zh": "🇨🇳 中文",
+            "ko": "🇰🇷 한국어"
+        }[x]
+    )
+
+with col2:
+    tgt_lang = st.selectbox(
+        "翻訳先の言語",
+        ["ja", "en", "fr", "de", "it", "zh", "ko"],
+        format_func=lambda x: {
+            "en": "🇺🇸 English", 
+            "ja": "🇯🇵 日本語",
+            "fr": "🇫🇷 Français", 
+            "de": "🇩🇪 Deutsch",
+            "it": "🇮🇹 Italiano", 
+            "zh": "🇨🇳 中文",
+            "ko": "🇰🇷 한국어"
+        }[x]
+    )
+
+# 入力テキスト
+input_text = st.text_area(
+    "翻訳したいテキストを入力してください",
+    height=100,
+    placeholder="例: Hello, how are you today?"
+)
+
+# 翻訳ボタン
+if st.button("🔄 翻訳する", type="primary"):
+    if input_text.strip():
+        if src_lang != tgt_lang:
+            try:
+                # 翻訳実行
+                with st.spinner("翻訳中..."):
+                    result = translator.translate(input_text, src=src_lang, dest=tgt_lang)
+                    translated_text = result.text
+                
+                # 結果表示
+                st.success("✅ 翻訳完了！")
+                
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    st.text_area(
+                        "翻訳結果",
+                        value=translated_text,
+                        height=100,
+                        disabled=True
+                    )
+                
+                with col2:
+                    # 音声生成ボタン
+                    if st.button("🔊 音声再生"):
+                        try:
+                            tts = gtts.gTTS(text=translated_text, lang=tgt_lang, slow=False)
+                            mp3_fp = io.BytesIO()
+                            tts.write_to_fp(mp3_fp)
+                            mp3_fp.seek(0)
+                            
+                            # 音声プレイヤー
+                            st.audio(mp3_fp.read(), format='audio/mp3')
+                        except Exception as e:
+                            st.error(f"音声生成エラー: {e}")
+                
+                # 履歴に追加
+                if 'history' not in st.session_state:
+                    st.session_state.history = []
+                
+                # 新しい翻訳を履歴の先頭に追加
+                history_item = {
+                    'original': input_text,
+                    'translated': translated_text,
+                    'src_lang': src_lang,
+                    'tgt_lang': tgt_lang
+                }
+                st.session_state.history.insert(0, history_item)
+                
+                # 5件まで保持
+                if len(st.session_state.history) > 5:
+                    st.session_state.history = st.session_state.history[:5]
+                    
+            except Exception as e:
+                st.error(f"翻訳エラー: {e}")
+        else:
+            st.warning("⚠️ 同じ言語が選択されています")
+    else:
+        st.warning("⚠️ テキストを入力してください")
+
+# 履歴表示
+if 'history' in st.session_state and st.session_state.history:
+    st.markdown("---")
+    st.subheader("📝 翻訳履歴（最新5件）")
     
-    history_item = {
-        'id': datetime.now().isoformat(),
-        'original': original,
-        'translated': translated,
-        'src_lang': src_lang,
-        'tgt_lang': tgt_lang,
-        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    }
-    
-    # 新しい項目を先頭に追加
-    translation_history.insert(0, history_item)
-    
-    # 5件を超えた場合、古いものを削除
-    if len(translation_history) > 5:
-        translation_history = translation_history[:5]
-
-@app.route("/")
-def index():
-    return render_template("index.html")
-
-@app.route("/translate", methods=["POST"])
-def translate():
-    try:
-        data = request.get_json()
-        text = data.get("text", "").strip()
-        src = data.get("src", "en")
-        tgt = data.get("tgt", "ja")
-        
-        if not text:
-            return jsonify({"error": "テキストが入力されていません"}), 400
+    for i, item in enumerate(st.session_state.history):
+        with st.expander(f"{i+1}. {item['original'][:30]}..."):
+            col1, col2 = st.columns(2)
             
-        if src == tgt:
-            add_to_history(text, text, src, tgt)
-            return jsonify({
-                "translated": text,
-                "audio": None
-            })
+            with col1:
+                st.text_area(
+                    f"原文 ({item['src_lang']})",
+                    value=item['original'],
+                    height=60,
+                    disabled=True,
+                    key=f"orig_{i}"
+                )
             
-        # Google Translateで翻訳実行
-        result = translator.translate(text, src=src, dest=tgt)
-        translated_text = result.text
-        
-        # 履歴に追加
-        add_to_history(text, translated_text, src, tgt)
-        
-        return jsonify({
-            "translated": translated_text,
-            "audio": None  # 音声は無効
-        })
-        
-    except Exception as e:
-        print(f"翻訳エラー: {e}")
-        return jsonify({"error": "翻訳中にエラーが発生しました"}), 500
+            with col2:
+                st.text_area(
+                    f"翻訳 ({item['tgt_lang']})",
+                    value=item['translated'],
+                    height=60,
+                    disabled=True,
+                    key=f"trans_{i}"
+                )
 
-@app.route("/history", methods=["GET"])
-def get_history():
-    """翻訳履歴を取得"""
-    return jsonify({"history": translation_history})
-
-@app.route("/clear_history", methods=["POST"])
-def clear_history():
-    """翻訳履歴をクリア"""
-    global translation_history
-    translation_history = []
-    return jsonify({"message": "履歴をクリアしました"})
-
-if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 10000))
-    app.run(debug=False, host="0.0.0.0", port=port)
+# サイドバー
+with st.sidebar:
+    st.markdown("## 📱 使い方")
+    st.markdown("""
+    1. 翻訳元と翻訳先の言語を選択
+    2. テキストを入力
+    3. 「翻訳する」ボタンをクリック
+    4. 音声再生も可能！
+    """)
+    
+    st.markdown("## ✨ 特徴")
+    st.markdown("""
+    - 🌍 7言語対応
+    - 🔊 音声読み上げ
+    - 📝 履歴管理（5件）
+    - ⚡ 高速翻訳
+    """)
+    
+    if st.button("🗑️ 履歴をクリア"):
+        st.session_state.history = []
+        st.rerun()
