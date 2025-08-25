@@ -29,14 +29,15 @@ col1, col2 = st.columns(2)
 with col1:
     src_lang = st.selectbox(
         "翻訳元の言語",
-        ["en", "ja", "fr", "de", "it", "zh", "ko"],
+        ["en", "ja", "fr", "de", "it", "zh-CN", "zh-TW", "ko"],
         format_func=lambda x: {
             "en": "🇺🇸 English", 
             "ja": "🇯🇵 日本語",
             "fr": "🇫🇷 Français", 
             "de": "🇩🇪 Deutsch",
             "it": "🇮🇹 Italiano", 
-            "zh": "🇨🇳 中文",
+            "zh-CN": "🇨🇳 中文（简体）",
+            "zh-TW": "🇹🇼 中文（繁體）",
             "ko": "🇰🇷 한국어"
         }[x]
     )
@@ -44,17 +45,27 @@ with col1:
 with col2:
     tgt_lang = st.selectbox(
         "翻訳先の言語",
-        ["ja", "en", "fr", "de", "it", "zh", "ko"],
+        ["ja", "en", "fr", "de", "it", "zh-CN", "zh-TW", "ko"],
         format_func=lambda x: {
             "en": "🇺🇸 English", 
             "ja": "🇯🇵 日本語",
             "fr": "🇫🇷 Français", 
             "de": "🇩🇪 Deutsch",
             "it": "🇮🇹 Italiano", 
-            "zh": "🇨🇳 中文",
-            "ko": "🇰🇷 한국語"
+            "zh-CN": "🇨🇳 中文（简体）",
+            "zh-TW": "🇹🇼 中文（繁體）",
+            "ko": "🇰🇷 한국어"
         }[x]
     )
+
+# gTTS用の言語コード変換関数
+def convert_lang_for_gtts(lang_code):
+    """deep_translator用の言語コードをgTTS用に変換"""
+    lang_mapping = {
+        "zh-CN": "zh",
+        "zh-TW": "zh-tw"
+    }
+    return lang_mapping.get(lang_code, lang_code)
 
 # 入力テキスト
 input_text = st.text_area(
@@ -123,9 +134,12 @@ if 'current_translation' in st.session_state:
         if st.button("🔊 音声再生"):
             try:
                 with st.spinner("音声生成中..."):
+                    # gTTS用の言語コードに変換
+                    gtts_lang = convert_lang_for_gtts(st.session_state.current_translation['tgt_lang'])
+                    
                     tts = gtts.gTTS(
                         text=st.session_state.current_translation['translated'], 
-                        lang=st.session_state.current_translation['tgt_lang'], 
+                        lang=gtts_lang, 
                         slow=False
                     )
                     mp3_fp = io.BytesIO()
@@ -142,9 +156,12 @@ if 'current_translation' in st.session_state:
         if st.checkbox("自動音声生成"):
             try:
                 with st.spinner("音声生成中..."):
+                    # gTTS用の言語コードに変換
+                    gtts_lang = convert_lang_for_gtts(st.session_state.current_translation['tgt_lang'])
+                    
                     tts = gtts.gTTS(
                         text=st.session_state.current_translation['translated'], 
-                        lang=st.session_state.current_translation['tgt_lang'], 
+                        lang=gtts_lang, 
                         slow=False
                     )
                     mp3_fp = io.BytesIO()
@@ -177,9 +194,12 @@ if 'history' in st.session_state and st.session_state.history:
                 if st.button(f"🔊 原文音声", key=f"orig_audio_{i}"):
                     try:
                         with st.spinner("音声生成中..."):
+                            # gTTS用の言語コードに変換
+                            gtts_lang = convert_lang_for_gtts(item['src_lang'])
+                            
                             tts = gtts.gTTS(
                                 text=item['original'], 
-                                lang=item['src_lang'], 
+                                lang=gtts_lang, 
                                 slow=False
                             )
                             mp3_fp = io.BytesIO()
@@ -203,9 +223,12 @@ if 'history' in st.session_state and st.session_state.history:
                 if st.button(f"🔊 翻訳音声", key=f"trans_audio_{i}"):
                     try:
                         with st.spinner("音声生成中..."):
+                            # gTTS用の言語コードに変換
+                            gtts_lang = convert_lang_for_gtts(item['tgt_lang'])
+                            
                             tts = gtts.gTTS(
                                 text=item['translated'], 
-                                lang=item['tgt_lang'], 
+                                lang=gtts_lang, 
                                 slow=False
                             )
                             mp3_fp = io.BytesIO()
@@ -229,7 +252,7 @@ with st.sidebar:
     
     st.markdown("## ✨ 特徴")
     st.markdown("""
-    - 🌍 7言語対応
+    - 🌍 8言語対応（简体・繁體中文対応）
     - 🔊 音声読み上げ（現在の翻訳＆履歴）
     - 📝 履歴管理（5件）
     - ⚡ 高速翻訳
